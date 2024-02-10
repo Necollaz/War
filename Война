@@ -1,0 +1,265 @@
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        Battlefield battlefield = new Battlefield();
+        battlefield.StartBattle();
+    }
+}
+
+public class Battlefield
+{
+    public void StartBattle()
+    {
+        var countries = InitializeCountries();
+
+        SimulateBattle(countries.Item1, countries.Item2);
+    }
+
+    private void SimulateBattle(Country countryOne, Country countryTwo)
+    {
+        int deadSoldiersCountryOne = 0;
+        int deadSoldiersCountryTwo = 0;
+
+        Console.WriteLine($"Бой начинается между {countryOne.Name} и {countryTwo.Name}!");
+
+        while(countryOne.Platoon.HasAliveSoldier() && countryTwo.Platoon.HasAliveSoldier())
+        {
+            Soldier soldierFromPlatoonOne = countryOne.Platoon.GetRandomAliveSoldier();
+            Soldier soldierFromPlatoonTwo = countryTwo.Platoon.GetRandomAliveSoldier();
+
+            if(soldierFromPlatoonOne != null && soldierFromPlatoonTwo != null)
+            {
+                soldierFromPlatoonOne.TakeDamage(soldierFromPlatoonTwo.Damage);
+                soldierFromPlatoonTwo.TakeDamage(soldierFromPlatoonOne.Damage);
+            }
+
+            deadSoldiersCountryOne += countryOne.Platoon.CountDeadSoldiers();
+            deadSoldiersCountryTwo += countryTwo.Platoon.CountDeadSoldiers();
+            countryOne.Platoon.RemoveDeadSoldiers();
+            countryTwo.Platoon.RemoveDeadSoldiers();
+        }
+
+        Console.WriteLine("Битва окончена!");
+
+        if (countryOne.Platoon.HasAliveSoldier() && countryTwo.Platoon.HasAliveSoldier() == false)
+        {
+            Console.WriteLine($"Победила страна - {countryOne.Name}!");
+        }
+        else if (countryTwo.Platoon.HasAliveSoldier() && countryOne.Platoon.HasAliveSoldier() == false)
+        {
+            Console.WriteLine($"Победила страна - {countryTwo.Name}!");
+        }
+        else
+        {
+            Console.WriteLine("Битва закончилась ничьей!");
+        }
+
+        Console.WriteLine($"{countryOne.Name} понесла потери - {deadSoldiersCountryOne} солдат.");
+        Console.WriteLine($"{countryTwo.Name} понесла потери - {deadSoldiersCountryTwo} солдат.");
+
+        Console.ReadKey();
+    }
+
+    private Tuple<Country, Country> InitializeCountries()
+    {
+        List<Soldier> soldiersCountryOne = new List<Soldier>
+        {
+            new Soldier("Солдат А1", 10, 100),
+            new Soldier("Солдат B1", 10, 100),
+            new Soldier("Солдат C1", 10, 100),
+            new Soldier("Солдат D1", 10, 100)
+        };
+
+        List<Soldier> soldiersCountryTwo = new List<Soldier>
+        {
+            new Soldier("Солдат А2", 12, 90),
+            new Soldier("Солдат B2", 12, 90),
+            new Soldier("Солдат C2", 12, 90),
+            new Soldier("Солдат D2", 12, 90)
+        };
+
+        Ability abilityCountryOne = new Ability(5, 2);
+        Ability abilityCountryTwo = new Ability(3, 4);
+
+        Platoon platoonCountryOne = new Platoon(soldiersCountryOne);
+        Platoon platoonCountryTwo = new Platoon(soldiersCountryTwo);
+
+        Country countryOne = new Country("Константинополь", platoonCountryOne, abilityCountryOne);
+        Country countryTwo = new Country("Вавилон", platoonCountryTwo, abilityCountryTwo);
+
+        return new Tuple<Country, Country>(countryOne, countryTwo);
+    }
+}
+
+public static class RandomProvider
+{
+    public static readonly Random Instance = new Random();
+}
+
+public class Soldier
+{
+    private List<Ability> _abilities = new List<Ability>();
+
+    public Soldier(string name, int damage, int health)
+    {
+        Name = name;
+        Damage = damage;
+        Health = health;
+        Defense = 0;
+    }
+
+    public string Name { get; private set; }
+    public int Damage { get; private set; }
+    public int Health { get; private set; }
+    public int Defense { get; private set; }
+
+    public void AddAbility(Ability ability)
+    {
+        _abilities.Add(ability);
+        ability.Apply(this);
+    }
+
+    public void IncreaseStrength(int amount)
+    {
+        Damage += amount;
+    }
+
+    public void IncreaseDefense(int amount)
+    {
+        Defense += amount;
+    }
+
+    public void TakeDamage(int damage)
+    {
+        int adjuctedDamage = Math.Max(0, damage - Defense);
+        Health = Math.Max(0, Health - adjuctedDamage);
+    }
+
+    public bool IsAlive()
+    {
+        return Health > 0;
+    }
+}
+
+public class Platoon
+{
+    private List<Soldier> _soldiers;
+
+    public Platoon(List<Soldier> soldiers)
+    {
+        _soldiers = soldiers;
+    }
+
+    public List<Soldier> Soldiers
+    {
+        get { return _soldiers; }
+    }
+
+    public Soldier GetRandomAliveSoldier()
+    {
+        List<Soldier> aliveSoldiers = new List<Soldier>();
+
+        foreach (var soldier in _soldiers)
+        {
+            if (soldier.IsAlive())
+            {
+                aliveSoldiers.Add(soldier);
+            }
+        }
+
+        if (aliveSoldiers.Count == 0) return null;
+
+        int randomIndex = RandomProvider.Instance.Next(aliveSoldiers.Count);
+        return aliveSoldiers[randomIndex];
+    }
+
+    public bool HasAliveSoldier()
+    {
+        foreach (var soldier in _soldiers)
+        {
+            if (soldier.IsAlive()) return true;
+        }
+
+        return false;
+    }
+
+    public int CountDeadSoldiers()
+    {
+        int deadCount = 0;
+
+        foreach (var soldier in _soldiers)
+        {
+            if (soldier.IsAlive() == false)
+            {
+                deadCount++;
+            }
+        }
+
+        return deadCount;
+    }
+
+    public void RemoveDeadSoldiers()
+    {
+        List<Soldier> aliveSoldiers = new List<Soldier>();
+
+        for (int i = 0; i < _soldiers.Count; i++)
+        {
+            if (_soldiers[i].IsAlive())
+            {
+                aliveSoldiers.Add(_soldiers[i]);
+            }
+        }
+
+        _soldiers = aliveSoldiers;
+    }
+}
+
+public class Ability
+{
+    public int Defense { get; private set; }
+    public int ExtraDamage { get; private set; }
+
+    public Ability(int defence = 0, int extraDamage = 0)
+    {
+        Defense = defence;
+        ExtraDamage = extraDamage;
+    }
+
+    public void Apply(Soldier soldier)
+    {
+        if(Defense > 0)
+        {
+            soldier.IncreaseDefense(Defense);
+        }
+
+        if(ExtraDamage > 0)
+        {
+            soldier.IncreaseStrength(ExtraDamage);
+        }
+    }
+}
+
+public class Country
+{
+    private Ability _ability;
+
+    public Country(string name, Platoon platoon, Ability ability)
+    {
+        Name = name;
+        Platoon = platoon;
+        _ability = ability;
+        ApplyAbilityToPlatoon();
+    }
+
+    public Platoon Platoon { get; private set; }
+    public string Name { get; private set; }
+
+    private void ApplyAbilityToPlatoon()
+    {
+        foreach (var soldier in Platoon.Soldiers)
+        {
+            _ability.Apply(soldier);
+        }
+    }
+}
